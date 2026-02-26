@@ -26,7 +26,7 @@ on:
         description: "Executor Docker image"
         required: false
         type: string
-        default: "arala/github_actions_executor:13"
+        default: "arala/github_actions_executor:14"
     secrets:
       access_token:
         description: "GitHub token for accessing files in external repos"
@@ -72,12 +72,18 @@ jobs:
           cat generated-workflow.yml
           echo ""
           echo "=== Generating matrix ==="
-          MATRIX=$(github-actions-executor generate-matrix \
+          github-actions-executor generate-matrix \
             --sources "${{ inputs.pipeline_config_sources }}" \
             --token "${{ secrets.access_token }}" \
-            --pipeline-vars "${{ inputs.pipeline_vars }}")
-          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
-          echo "$MATRIX" | python3 -m json.tool
+            --pipeline-vars "${{ inputs.pipeline_vars }}" \
+            > /tmp/matrix.json
+          echo "--- Matrix JSON ---"
+          cat /tmp/matrix.json
+          echo ""
+          echo "matrix<<MATRIX_EOF" >> $GITHUB_OUTPUT
+          cat /tmp/matrix.json >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "MATRIX_EOF" >> $GITHUB_OUTPUT
 
       - name: Upload generated workflow
         uses: actions/upload-artifact@v4
