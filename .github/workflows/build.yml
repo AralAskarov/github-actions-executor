@@ -38,6 +38,10 @@ jobs:
   build_job:
     if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: ${{ vars.IMAGE_NAME }}
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -49,10 +53,6 @@ jobs:
           docker tag $IMAGE_NAME:latest $DOCKER_USERNAME/$IMAGE_NAME:latest
           docker push $DOCKER_USERNAME/$IMAGE_NAME:${{ vars.IMAGE_VERSION }}
           docker push $DOCKER_USERNAME/$IMAGE_NAME:latest
-        env:
-          IMAGE_NAME: ${{ vars.IMAGE_NAME }}
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
   update_version:
     needs: build_job
