@@ -46,7 +46,7 @@ on:
         description: "Executor Docker image"
         required: false
         type: string
-        default: "arala/github_actions_executor:6"
+        default: "arala/github_actions_executor:8"
 
 jobs:
   generate:
@@ -97,6 +97,18 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set environment variables
+        run: |
+          echo '${{ matrix.env_json }}' | python3 -c "
+          import sys, json, os
+          env = json.load(sys.stdin)
+          gh_env = os.environ.get('GITHUB_ENV', '')
+          if gh_env:
+              with open(gh_env, 'a') as f:
+                  for k, v in env.items():
+                      f.write(f'{k}={v}\n')
+          "
 
       - name: "${{ matrix.command }}"
         run: ${{ matrix.command }}
