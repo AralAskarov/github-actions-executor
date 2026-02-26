@@ -46,7 +46,7 @@ on:
         description: "Executor Docker image"
         required: false
         type: string
-        default: "arala/github_actions_executor:8"
+        default: "arala/github_actions_executor:9"
 
 jobs:
   generate:
@@ -90,15 +90,13 @@ jobs:
     name: "Execute: ${{ matrix.job_name }}"
     needs: generate
     runs-on: ubuntu-latest
-    container:
-      image: ${{ matrix.image }}
     strategy:
       matrix: ${{ fromJson(needs.generate.outputs.matrix) }}
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set environment variables
+      - name: Parse environment variables
         run: |
           echo '${{ matrix.env_json }}' | python3 -c "
           import sys, json, os
@@ -110,5 +108,20 @@ jobs:
                       f.write(f'{k}={v}\n')
           "
 
-      - name: "${{ matrix.command }}"
-        run: ${{ matrix.command }}
+      - name: "${{ matrix.job_name }}"
+        run: |
+          # Build docker run env flags from matrix env_json
+          ENV_FLAGS=$(echo '${{ matrix.env_json }}' | python3 -c "
+          import sys, json
+          env = json.load(sys.stdin)
+          for k, v in env.items():
+              print(f'-e {k}={v}')
+          " | tr '\n' ' ')
+
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            $ENV_FLAGS \
+            ${{ matrix.image }} \
+            sh -c "${{ matrix.command }}"
