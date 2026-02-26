@@ -46,7 +46,7 @@ on:
         description: "Executor Docker image"
         required: false
         type: string
-        default: "arala/github_actions_executor:9"
+        default: "arala/github_actions_executor:10"
 
 jobs:
   generate:
@@ -110,12 +110,14 @@ jobs:
 
       - name: "${{ matrix.job_name }}"
         run: |
-          # Build docker run env flags from matrix env_json
+          # Build docker run env flags, filtering out dind-specific vars
           ENV_FLAGS=$(echo '${{ matrix.env_json }}' | python3 -c "
           import sys, json
+          SKIP = {'DOCKER_HOST', 'DOCKER_TLS_CERTDIR'}
           env = json.load(sys.stdin)
           for k, v in env.items():
-              print(f'-e {k}={v}')
+              if k not in SKIP:
+                  print(f'-e {k}={v}')
           " | tr '\n' ' ')
 
           docker run --rm \
