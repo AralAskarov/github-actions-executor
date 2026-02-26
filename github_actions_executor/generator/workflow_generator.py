@@ -1,11 +1,33 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 import yaml
 
 from github_actions_executor.api.base import Resource
+
+_VAR_RE = re.compile(r"\$\{(\w+)\}")
+
+
+def resolve_vars(value: str, variables: Dict[str, str]) -> str:
+    """Resolve ${VAR} references in a string using provided variables."""
+    def _replace(m: re.Match) -> str:
+        var_name = m.group(1)
+        return variables.get(var_name, m.group(0))
+    return _VAR_RE.sub(_replace, value)
+
+
+def resolve_vars_deep(obj: Any, variables: Dict[str, str]) -> Any:
+    """Recursively resolve ${VAR} references in dicts, lists, and strings."""
+    if isinstance(obj, str):
+        return resolve_vars(obj, variables)
+    if isinstance(obj, dict):
+        return {k: resolve_vars_deep(v, variables) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [resolve_vars_deep(item, variables) for item in obj]
+    return obj
 
 
 @dataclass
@@ -64,6 +86,13 @@ class WorkflowGenerator:
 
         if global_env:
             result["env"] = global_env
+
+        # Resolve ${VAR} references in jobs using global + pipeline vars
+        all_vars = dict(global_env)
+        for job in result.get("jobs", {}).values():
+            job_env = job.get("env", {})
+            all_vars.update(job_env)
+        result["jobs"] = resolve_vars_deep(result.get("jobs", {}), all_vars)
 
         # Override runner if configured
         if self.config.default_runner != "ubuntu-latest":
