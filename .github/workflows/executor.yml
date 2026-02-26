@@ -22,7 +22,7 @@ on:
         description: "Executor Docker image"
         required: false
         type: string
-        default: "arala/github_actions_executor:1"
+        default: "arala/github_actions_executor:3"
     secrets:
       access_token:
         description: "GitHub token for accessing files in external repos"
