@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "github-actions-executor"
+version = "0.1.0"
+description = "Loom GitHub Actions executor"
+packages = [{include = "github_actions_executor"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pydantic = "^2.11"
+PyYAML = "^6.0"
+click = "^8.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^9.0"
+pytest-cov = "^6.0"
+mypy = "^1.18"
+ruff = "^0.14"
+
+[tool.poetry.scripts]
+github-actions-executor = "github_actions_executor.__main__:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

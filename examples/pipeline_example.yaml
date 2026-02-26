@@ -1,0 +1,49 @@
+---
+apiVersion: v1
+kind: LoomConfig
+global:
+  vars:
+    DOCKER_REGISTRY: ghcr.io
+    DOCKER_IMAGE: ${DOCKER_REGISTRY}/myproject/runner:latest
+
+---
+apiVersion: v1
+kind: LoomPipeline
+pipeline:
+  id: notification-pipeline
+  name: Notification Pipeline
+  vars:
+    NOTIFICATION_ENABLED: "true"
+
+  stages:
+    - name: notify
+      job: send-email-notification
+    - name: report
+      job: send-report
+
+  jobs:
+    send-email-notification:
+      path: ${DOCKER_IMAGE}
+      command: send_notification
+      input:
+        params:
+          email_address: team@example.com
+          subject: "Pipeline completed"
+        secure_params:
+          smtp_password: ${SMTP_PASSWORD}
+      when:
+        statuses: SUCCESS
+
+    send-report:
+      path: ${DOCKER_IMAGE}
+      command: generate_report
+      input:
+        params:
+          format: html
+          recipients: team@example.com
+      output:
+        files:
+          HTML_REPORT: reports/report.html
+          MD_REPORT: reports/report.md
+      when:
+        statuses: SUCCESS
