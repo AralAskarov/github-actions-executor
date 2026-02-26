@@ -248,16 +248,21 @@ def _generate_matrix(sources, token, pipeline_vars, force):
 
         matrix_items = []
         for job_name, job_def in jobs.items():
-            item = {
-                "job_name": job_name,
-                "image": job_def.get("container", {}).get("image", ""),
-                "command": "",
-                "env_json": json.dumps({**global_env, **job_def.get("env", {})}),
-            }
+            image = job_def.get("container", {}).get("image", "")
+            logger.info(f"Matrix job '{job_name}': container={job_def.get('container')}, image='{image}'")
+
+            command = ""
             for step in job_def.get("steps", []):
                 if "run" in step and step.get("name", "").startswith("Run "):
-                    item["command"] = step["run"]
+                    command = step["run"]
                     break
+
+            item = {
+                "job_name": job_name,
+                "image": image,
+                "command": command,
+                "env_json": json.dumps({**global_env, **job_def.get("env", {})}),
+            }
             matrix_items.append(item)
 
         output = json.dumps({"include": matrix_items})
