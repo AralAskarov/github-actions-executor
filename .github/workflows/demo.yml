@@ -1,0 +1,41 @@
+name: Demo Inputs
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_version:
+        description: "Image version to build"
+        required: true
+        default: "1"
+        type: string
+      environment:
+        description: "Deploy environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+      notify:
+        description: "Send Telegram notification"
+        type: boolean
+        default: true
+      log_level:
+        description: "Log level"
+        required: false
+        type: choice
+        options:
+          - info
+          - debug
+          - error
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Image version: ${{ github.event.inputs.image_version }}"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Notify: ${{ github.event.inputs.notify }}"
+          echo "Log level: ${{ github.event.inputs.log_level }}"
+          echo "All good!"
