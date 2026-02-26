@@ -1,0 +1,92 @@
+# Использование из другого репо:
+#   jobs:
+#     run-pipeline:
+#       uses: AralAskarov/github-actions-executor/.github/workflows/executor.yml@main
+#       with:
+#         pipeline_config_sources: "https://github.com/org/repo/blob/main/pipeline.yaml"
+#       secrets:
+#         access_token: ${{ secrets.GH_PAT }}
+#
+# Или запуск руками через UI: Actions → Loom Pipeline Executor → Run workflow
+
+name: Loom Pipeline Executor
+
+on:
+  workflow_call:
+    inputs:
+      pipeline_config_sources:
+        description: "YAML links to pipeline definitions, comma/space separated"
+        required: true
+        type: string
+      executor_image:
+        description: "Executor Docker image"
+        required: false
+        type: string
+        default: "arala/loom_github_actions_executor:1"
+    secrets:
+      access_token:
+        description: "GitHub token for accessing files in external repos"
+        required: false
+
+  workflow_dispatch:
+    inputs:
+      pipeline_config_sources:
+        description: "YAML links to pipeline definitions, comma/space separated"
+        required: true
+        type: string
+      executor_image:
+        description: "Executor Docker image"
+        required: false
+        type: string
+        default: "arala/loom_github_actions_executor:latest"
+
+jobs:
+  generate:
+    name: Generate Pipeline
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ inputs.executor_image }}
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate workflow and matrix
+        id: gen
+        run: |
+          echo "=== Generating workflow ==="
+          github-actions-executor run \
+            --sources "${{ inputs.pipeline_config_sources }}" \
+            --token "${{ secrets.access_token }}" \
+            -o generated-workflow.yml
+          echo "--- Generated workflow ---"
+          cat generated-workflow.yml
+          echo ""
+          echo "=== Generating matrix ==="
+          MATRIX=$(github-actions-executor generate-matrix \
+            --sources "${{ inputs.pipeline_config_sources }}" \
+            --token "${{ secrets.access_token }}")
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "$MATRIX" | python3 -m json.tool
+
+      - name: Upload generated workflow
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-workflow
+          path: generated-workflow.yml
+          retention-days: 1
+
+  execute:
+    name: "Execute: ${{ matrix.job_name }}"
+    needs: generate
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.image }}
+    strategy:
+      matrix: ${{ fromJson(needs.generate.outputs.matrix) }}
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "${{ matrix.command }}"
+        run: ${{ matrix.command }}

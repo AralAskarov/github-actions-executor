@@ -185,6 +185,64 @@ def _run(sources, token, output, default_runner, force):
         sys.exit(1)
 
 
+@cli.command("generate-matrix")
+@click.option("--sources", required=True, help="YAML sources (comma/space separated)")
+@click.option("--token", default=None, help="GitHub token for remote sources")
+@click.option("--force", is_flag=True, help="Generate even if validation fails")
+def _generate_matrix(sources, token, force):
+    """Generate a JSON matrix for GitHub Actions dynamic jobs."""
+    import json
+
+    try:
+        source_list = parse_sources(sources)
+        if not source_list:
+            logger.error("No sources provided")
+            sys.exit(1)
+
+        yaml_content = fetch_all(source_list, token=token)
+        decoder = create_decoder()
+        resources = decoder.decode_all(yaml_content)
+
+        if not resources:
+            logger.warning("No resources found")
+            sys.exit(1)
+
+        if not _validate_resources(resources, force):
+            sys.exit(1)
+
+        config = GeneratorConfig()
+        generator = WorkflowGenerator(config)
+        generator.add_resources(resources)
+        workflow = generator.generate()
+
+        jobs = workflow.get("jobs", {})
+        global_env = workflow.get("env", {})
+
+        matrix_items = []
+        for job_name, job_def in jobs.items():
+            item = {
+                "job_name": job_name,
+                "image": job_def.get("container", {}).get("image", ""),
+                "command": "",
+                "env_json": json.dumps({**global_env, **job_def.get("env", {})}),
+            }
+            for step in job_def.get("steps", []):
+                if "run" in step and step.get("name", "").startswith("Run "):
+                    item["command"] = step["run"]
+                    break
+            matrix_items.append(item)
+
+        output = json.dumps({"include": matrix_items})
+        sys.stdout.write(output)
+
+    except DecodeError as e:
+        logger.error(f"Decode error: {e}")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"{e}")
+        sys.exit(1)
+
+
 @cli.command("list-types")
 def _list_types():
     from github_actions_executor.scheme import scheme

@@ -1,0 +1,19 @@
+name: Run Loom Pipeline
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pipeline_config_sources:
+        description: "YAML links to pipeline definitions, comma/space separated"
+        required: true
+        type: string
+
+jobs:
+  run-pipeline:
+    uses: AralAskarov/github-actions-executor/.github/workflows/executor.yml@main
+    with:
+      pipeline_config_sources: ${{ inputs.pipeline_config_sources || vars.PIPELINE_CONFIG_SOURCES }}
+    secrets:
+      access_token: ${{ secrets.GH_PAT }}
