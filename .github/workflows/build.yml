@@ -1,0 +1,45 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  build_job:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: docker build -t $IMAGE_NAME .
+
+      - run: |
+          docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+          docker tag $IMAGE_NAME:latest $DOCKER_USERNAME/$IMAGE_NAME:${{ vars.IMAGE_VERSION }}
+          docker tag $IMAGE_NAME:latest $DOCKER_USERNAME/$IMAGE_NAME:latest
+          docker push $DOCKER_USERNAME/$IMAGE_NAME:${{ vars.IMAGE_VERSION }}
+          docker push $DOCKER_USERNAME/$IMAGE_NAME:latest
+        env:
+          IMAGE_NAME: ${{ vars.IMAGE_NAME }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  update_version:
+    needs: build_job
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          IMAGE_VERSION_VALUE=$(gh variable get IMAGE_VERSION -R ${{ github.repository }})
+          IMAGE_VERSION_VALUE=$((IMAGE_VERSION_VALUE + 1))
+          gh variable set IMAGE_VERSION --body "$IMAGE_VERSION_VALUE" -R ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+
+      - run: |
+          curl -s -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHANNEL_ID}" \
+            -d text="Build success: ${{ github.repository }}@${{ github.sha }}" \
+            -d parse_mode="Markdown"
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
