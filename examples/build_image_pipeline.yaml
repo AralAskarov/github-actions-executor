@@ -1,0 +1,39 @@
+---
+apiVersion: v1
+kind: LoomConfig
+global:
+  vars:
+    LOOM_CLI_IMAGE: ghcr.io/myorg/loom-cli:latest
+
+---
+apiVersion: v1
+kind: LoomPipeline
+pipeline:
+  id: build-docker-image
+  name: Build Docker Image Pipeline
+
+  stages:
+    - name: build
+      job: build-image
+
+  jobs:
+    build-image:
+      path: ${LOOM_CLI_IMAGE}
+      command: build_image
+      input:
+        params:
+          systems.git.url: https://github.com/myorg/myapp.git
+          systems.git.user: x-access-token
+          systems.git.branch: main
+          systems.registry.url: ghcr.io
+          systems.registry.user: deploy-bot
+          params.dockerfile: Dockerfile
+          params.image: myorg/myapp
+          params.tag: ${GITHUB_SHA}
+
+        secure_params:
+          systems.git.token: ${GITHUB_TOKEN}
+          systems.registry.password: ${REGISTRY_PASSWORD}
+
+      when:
+        statuses: SUCCESS
