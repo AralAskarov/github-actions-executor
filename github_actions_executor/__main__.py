@@ -218,6 +218,14 @@ def _generate_matrix(sources, token, pipeline_vars, force):
     """Generate a JSON matrix for GitHub Actions dynamic jobs."""
     import json
 
+    # Redirect all logging to stderr so stdout contains only clean JSON
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+    logging.basicConfig(
+        stream=sys.stderr,
+        format="[%(asctime)s] [%(levelname)-5s] [%(filename)s:%(lineno)-3s] %(message)s",
+    )
+
     try:
         source_list = parse_sources(sources)
         if not source_list:
