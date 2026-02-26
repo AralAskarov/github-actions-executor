@@ -26,7 +26,7 @@ on:
         description: "Executor Docker image"
         required: false
         type: string
-        default: "arala/github_actions_executor:7"
+        default: "arala/github_actions_executor:12"
     secrets:
       access_token:
         description: "GitHub token for accessing files in external repos"
@@ -100,12 +100,14 @@ jobs:
         run: |
           echo '${{ matrix.env_json }}' | python3 -c "
           import sys, json, os
+          SKIP = {'DOCKER_HOST', 'DOCKER_TLS_CERTDIR'}
           env = json.load(sys.stdin)
           gh_env = os.environ.get('GITHUB_ENV', '')
           if gh_env:
               with open(gh_env, 'a') as f:
                   for k, v in env.items():
-                      f.write(f'{k}={v}\n')
+                      if k not in SKIP:
+                          f.write(f'{k}={v}\n')
           "
 
       - name: "${{ matrix.job_name }}"
