@@ -2,10 +2,41 @@ name: Build & Deploy
 
 on:
   push:
-    branches: [master]
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      image_version:
+        description: 'Image version to build'
+        required: true
+        default: '1'
+        type: string
+      environment:
+        description: 'Deploy environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+      notify:
+        description: 'Send Telegram notification'
+        type: boolean
+        default: true
+      log_level:
+        description: 'Log level'
+        required: false
+        type: choice
+        options:
+          - info
+          - debug
+          - error
 
 jobs:
   build_job:
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
