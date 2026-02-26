@@ -26,7 +26,7 @@ on:
         description: "Executor Docker image"
         required: false
         type: string
-        default: "arala/github_actions_executor:15"
+        default: "arala/github_actions_executor:16"
     secrets:
       access_token:
         description: "GitHub token for accessing files in external repos"
@@ -118,19 +118,21 @@ jobs:
       - name: "${{ matrix.job_name }}"
         run: |
           # Build docker run env flags, filtering out dind-specific vars
-          ENV_FLAGS=$(echo '${{ matrix.env_json }}' | python3 -c "
+          # Use --env-file to avoid shell word-splitting issues with spaces in values
+          echo '${{ matrix.env_json }}' | python3 -c "
           import sys, json
           SKIP = {'DOCKER_HOST', 'DOCKER_TLS_CERTDIR'}
           env = json.load(sys.stdin)
-          for k, v in env.items():
-              if k not in SKIP:
-                  print(f'-e {k}={v}')
-          " | tr '\n' ' ')
+          with open('/tmp/docker.env', 'w') as f:
+              for k, v in env.items():
+                  if k not in SKIP:
+                      f.write(f'{k}={v}\n')
+          "
 
           docker run --rm \
+            --env-file /tmp/docker.env \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
-            $ENV_FLAGS \
             ${{ matrix.image }} \
             sh -c "${{ matrix.command }}"
