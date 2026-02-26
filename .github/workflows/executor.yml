@@ -46,7 +46,7 @@ on:
         description: "Executor Docker image"
         required: false
         type: string
-        default: "arala/github_actions_executor:5"
+        default: "arala/github_actions_executor:6"
 
 jobs:
   generate:
@@ -62,25 +62,20 @@ jobs:
       - name: Generate workflow and matrix
         id: gen
         run: |
-          VARS_FLAG=""
-          if [ -n "${{ inputs.pipeline_vars }}" ]; then
-            VARS_FLAG="--pipeline-vars \"${{ inputs.pipeline_vars }}\""
-          fi
-
           echo "=== Generating workflow ==="
-          eval github-actions-executor run \
+          github-actions-executor run \
             --sources "${{ inputs.pipeline_config_sources }}" \
             --token "${{ secrets.access_token }}" \
-            $VARS_FLAG \
+            --pipeline-vars "${{ inputs.pipeline_vars }}" \
             -o generated-workflow.yml
           echo "--- Generated workflow ---"
           cat generated-workflow.yml
           echo ""
           echo "=== Generating matrix ==="
-          MATRIX=$(eval github-actions-executor generate-matrix \
+          MATRIX=$(github-actions-executor generate-matrix \
             --sources "${{ inputs.pipeline_config_sources }}" \
             --token "${{ secrets.access_token }}" \
-            $VARS_FLAG)
+            --pipeline-vars "${{ inputs.pipeline_vars }}")
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
           echo "$MATRIX" | python3 -m json.tool
 
