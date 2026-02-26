@@ -4,7 +4,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import click
 
@@ -15,6 +15,20 @@ from github_actions_executor.generator import WorkflowGenerator, GeneratorConfig
 from github_actions_executor.validator import create_default_validator_chain
 
 logger = logging.getLogger("github_actions_executor")
+
+
+def parse_pipeline_vars(raw: str | None) -> Dict[str, str]:
+    """Parse 'KEY1=val1; KEY2=val2' into a dict. Tolerates extra whitespace."""
+    result: Dict[str, str] = {}
+    if not raw or not raw.strip():
+        return result
+    for pair in raw.split(";"):
+        pair = pair.strip()
+        if not pair or "=" not in pair:
+            continue
+        key, _, value = pair.partition("=")
+        result[key.strip()] = value.strip()
+    return result
 
 
 def load_yaml_files(paths: List[str]) -> str:
@@ -49,12 +63,14 @@ def _validate_resources(resources, force: bool = False) -> bool:
     return True
 
 
-def _generate_output(resources, default_runner: Optional[str] = None) -> str:
+def _generate_output(resources, default_runner: Optional[str] = None, extra_vars: Optional[Dict[str, str]] = None) -> str:
     config = GeneratorConfig(
         default_runner=default_runner or "ubuntu-latest",
     )
     generator = WorkflowGenerator(config)
     generator.add_resources(resources)
+    if extra_vars:
+        generator.add_extra_vars(extra_vars)
     return generator.generate_yaml()
 
 
@@ -144,8 +160,9 @@ def _validate(input_files):
 @click.option("--token", default=None, help="GitHub token for remote sources")
 @click.option("-o", "--output", default=None, type=click.Path(), help="Output file path")
 @click.option("--default-runner", default=None, help="Default runner for all jobs")
+@click.option("--pipeline-vars", default=None, help="Extra variables: KEY1=val1; KEY2=val2")
 @click.option("--force", is_flag=True, help="Generate even if validation fails")
-def _run(sources, token, output, default_runner, force):
+def _run(sources, token, output, default_runner, pipeline_vars, force):
     try:
         source_list = parse_sources(sources)
         if not source_list:
@@ -156,10 +173,17 @@ def _run(sources, token, output, default_runner, force):
         logger.info(f"  token:          {'***' if token else '<not set>'}")
         logger.info(f"  output:         {output or '<stdout>'}")
         logger.info(f"  default-runner: {default_runner or 'ubuntu-latest'}")
+        logger.info(f"  pipeline-vars:  {pipeline_vars or '<not set>'}")
         logger.info(f"  force:          {force}")
         logger.info(f"  sources ({len(source_list)}):")
         for src in source_list:
             logger.info(f"    - {src}")
+
+        extra_vars = parse_pipeline_vars(pipeline_vars)
+        if extra_vars:
+            logger.info(f"  resolved vars ({len(extra_vars)}):")
+            for k, v in extra_vars.items():
+                logger.info(f"    {k} = {v}")
 
         logger.info("Fetching sources...")
         yaml_content = fetch_all(source_list, token=token)
@@ -174,7 +198,7 @@ def _run(sources, token, output, default_runner, force):
         if not _validate_resources(resources, force):
             sys.exit(1)
 
-        result = _generate_output(resources, default_runner)
+        result = _generate_output(resources, default_runner, extra_vars)
         _write_output(result, output)
 
     except DecodeError as e:
@@ -188,8 +212,9 @@ def _run(sources, token, output, default_runner, force):
 @cli.command("generate-matrix")
 @click.option("--sources", required=True, help="YAML sources (comma/space separated)")
 @click.option("--token", default=None, help="GitHub token for remote sources")
+@click.option("--pipeline-vars", default=None, help="Extra variables: KEY1=val1; KEY2=val2")
 @click.option("--force", is_flag=True, help="Generate even if validation fails")
-def _generate_matrix(sources, token, force):
+def _generate_matrix(sources, token, pipeline_vars, force):
     """Generate a JSON matrix for GitHub Actions dynamic jobs."""
     import json
 
@@ -213,6 +238,9 @@ def _generate_matrix(sources, token, force):
         config = GeneratorConfig()
         generator = WorkflowGenerator(config)
         generator.add_resources(resources)
+        extra_vars = parse_pipeline_vars(pipeline_vars)
+        if extra_vars:
+            generator.add_extra_vars(extra_vars)
         workflow = generator.generate()
 
         jobs = workflow.get("jobs", {})

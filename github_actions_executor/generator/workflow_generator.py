@@ -44,6 +44,7 @@ class WorkflowGenerator:
         self.config = config or GeneratorConfig()
         self._configs: List[Resource] = []
         self._pipelines: List[Resource] = []
+        self._extra_vars: Dict[str, str] = {}
 
     def add_resource(self, resource: Resource) -> None:
         if resource.kind == "LoomConfig":
@@ -54,6 +55,9 @@ class WorkflowGenerator:
     def add_resources(self, resources: List[Resource]) -> None:
         for r in resources:
             self.add_resource(r)
+
+    def add_extra_vars(self, variables: Dict[str, str]) -> None:
+        self._extra_vars.update(variables)
 
     def generate(self) -> Dict[str, Any]:
         result: Dict[str, Any] = {}
@@ -87,8 +91,9 @@ class WorkflowGenerator:
         if global_env:
             result["env"] = global_env
 
-        # Resolve ${VAR} references in jobs using global + pipeline vars
+        # Resolve ${VAR} references in jobs using global + pipeline + extra vars
         all_vars = dict(global_env)
+        all_vars.update(self._extra_vars)
         for job in result.get("jobs", {}).values():
             job_env = job.get("env", {})
             all_vars.update(job_env)
@@ -120,3 +125,4 @@ class WorkflowGenerator:
     def clear(self) -> None:
         self._configs.clear()
         self._pipelines.clear()
+        self._extra_vars.clear()

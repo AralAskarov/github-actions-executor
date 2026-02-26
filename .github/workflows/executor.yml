@@ -4,10 +4,9 @@
 #       uses: AralAskarov/github-actions-executor/.github/workflows/executor.yml@main
 #       with:
 #         pipeline_config_sources: "https://github.com/org/repo/blob/main/pipeline.yaml"
+#         pipeline_vars: "KEY1=val1; KEY2=val2"
 #       secrets:
 #         access_token: ${{ secrets.GH_PAT }}
-#
-# Или запуск руками через UI: Actions → Loom Pipeline Executor → Run workflow
 
 name: Loom Pipeline Executor
 
@@ -18,11 +17,16 @@ on:
         description: "YAML links to pipeline definitions, comma/space separated"
         required: true
         type: string
+      pipeline_vars:
+        description: "Extra variables: KEY1=val1; KEY2=val2"
+        required: false
+        type: string
+        default: ""
       executor_image:
         description: "Executor Docker image"
         required: false
         type: string
-        default: "arala/github_actions_executor:5"
+        default: "arala/github_actions_executor:7"
     secrets:
       access_token:
         description: "GitHub token for accessing files in external repos"
@@ -34,11 +38,15 @@ on:
         description: "YAML links to pipeline definitions, comma/space separated"
         required: true
         type: string
+      pipeline_vars:
+        description: "Extra variables: KEY1=val1; KEY2=val2"
+        required: false
+        type: string
       executor_image:
         description: "Executor Docker image"
         required: false
         type: string
-        default: "arala/loom_github_actions_executor:latest"
+        default: "arala/github_actions_executor:5"
 
 jobs:
   generate:
@@ -54,18 +62,25 @@ jobs:
       - name: Generate workflow and matrix
         id: gen
         run: |
+          VARS_FLAG=""
+          if [ -n "${{ inputs.pipeline_vars }}" ]; then
+            VARS_FLAG="--pipeline-vars \"${{ inputs.pipeline_vars }}\""
+          fi
+
           echo "=== Generating workflow ==="
-          github-actions-executor run \
+          eval github-actions-executor run \
             --sources "${{ inputs.pipeline_config_sources }}" \
             --token "${{ secrets.access_token }}" \
+            $VARS_FLAG \
             -o generated-workflow.yml
           echo "--- Generated workflow ---"
           cat generated-workflow.yml
           echo ""
           echo "=== Generating matrix ==="
-          MATRIX=$(github-actions-executor generate-matrix \
+          MATRIX=$(eval github-actions-executor generate-matrix \
             --sources "${{ inputs.pipeline_config_sources }}" \
-            --token "${{ secrets.access_token }}")
+            --token "${{ secrets.access_token }}" \
+            $VARS_FLAG)
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
           echo "$MATRIX" | python3 -m json.tool
 
